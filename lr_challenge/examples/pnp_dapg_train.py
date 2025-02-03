@@ -15,10 +15,10 @@ print("Using device:", device)
 
 # Update deprecated tensor type setting
 torch.set_default_dtype(torch.float32)
-torch.set_default_device(device)
+torch.set_default_device("cpu")
 
 # Initialize environment
-env = gym.make("PandaPickAndPlaceDense-v3",     
+env = gym.make("PandaSlideDense",     
     render_mode="human",
     renderer="OpenGL",
     render_width=1080,
@@ -60,8 +60,8 @@ print("Networks initialized with stable parameters")
 dapg = DAPG(
     policy_network=policy_net,      # The neural network that outputs actions given states
     value_network=value_net,        # The neural network that estimates state values (V(s))
-    learning_rate=3e-4,            # Step size for policy updates (Adam optimizer default - .0001)
-    gamma=0.99,                    # Discount factor for future rewards (standard RL parameter - .99)
+    learning_rate=3e-3,            # Step size for policy updates (Adam optimizer default - .0001)
+    gamma=0.95,                    # Discount factor for future rewards (standard RL parameter - .99)
     delta=0.01,                    # KL divergence limit for trust region (controls how much policy can change - .01)
     damping_coeff=0.1,            # Adds stability to Fisher matrix inversion (prevents numerical issues)
     lam_0=0.5,                    # Initial weight for demonstration data vs collected data
@@ -73,7 +73,7 @@ dapg = DAPG(
 # Training parameters
 num_episodes = 100000
 max_steps_per_episode = 1000
-frames_per_batch = 1000
+frames_per_batch = 250
 trajectories_per_update = 100
 
 # Initialize tracking variables

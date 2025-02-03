@@ -1,0 +1,10 @@
+torch
+gymnasium
+numpy
+packaging
+cloudpickle
+matplotlib
+panda-gym
+
+[tests]
+pytest

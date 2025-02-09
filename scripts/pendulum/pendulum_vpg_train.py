@@ -3,9 +3,20 @@ from gymnasium.wrappers import RecordVideo
 import torch
 import numpy as np
 from lr_challenge.learning.policy import GaussianActorPolicy, ValueNetwork
-from lr_challenge.learning.vpg import VanillaPolicyGradient
+from lr_challenge.learning.VPG import VanillaPolicyGradient
+from lr_challenge.util import save_training_plots, NumpyEncoder
 import datetime
 import pprint
+import os
+import json
+from collections import defaultdict
+
+
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+run_dir = f"./data/pendulum/{timestamp}"
+plots_dir = f"{run_dir}/plots"
+video_dir = f"{run_dir}/videos"
+
 # Set seeds for reproducibility
 SEED = 42
 torch.manual_seed(SEED)
@@ -15,16 +26,22 @@ np.random.seed(SEED)
 env = gym.make("Pendulum-v1", render_mode="rgb_array")
 env = RecordVideo(
     env,
-    video_folder=f"./videos/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}/",  # Will create this directory with timestamp
-    episode_trigger=lambda x: x % 500 == 0,
-)  # Record every 100th episode
+    video_folder=video_dir,
+    episode_trigger=lambda x: x % 100 == 0,
+    video_length=1000,
+)
+
+
+# Create directories
+os.makedirs(plots_dir, exist_ok=True)
+os.makedirs(video_dir, exist_ok=True)
 
 # Create networks
 obs_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 hidden_dims = [32, 32]
 
-# Initialize policy with smaller std for more precise initial actions
+
 policy = GaussianActorPolicy.from_gym_env(
     env,
     device="cuda:0",
@@ -32,15 +49,14 @@ policy = GaussianActorPolicy.from_gym_env(
     activation=torch.nn.Tanh(),  # Tanh good for control tasks
     seed=SEED,
 )
-# Initialize log_stds to smaller value for more precise initial actions
-with torch.no_grad():
-    policy.log_stds.data.fill_(-1.0)  # exp(0) ≈ 1 standard deviation
+
+policy.log_stds.data.fill_(0)  # exp(0) ≈ 1 standard deviation
 
 # Value network with orthogonal initialization (already implemented in ValueNetwork)
 value_net = ValueNetwork.from_gym_env(
     env,
     device="cuda:0",
-    hidden_dims=hidden_dims,  # Same architecture as policy
+    hidden_dims=hidden_dims,
     seed=SEED,
 )
 
@@ -49,24 +65,21 @@ vpg = VanillaPolicyGradient(
     policy=policy,
     value_network=value_net,
     action_dim=action_dim,
-    gamma=0.99,  # Standard discount
-    gae_lambda=0.95,  # GAE lambda
-    learning_rate=3e-4,  # Standard LR for Adam
+    gamma=0.99,
+    learning_rate=3e-3,
     device="cuda:0",
     seed=SEED,
 )
 
 # Modify training parameters
-num_episodes = 4000  # More episodes
-max_steps = 100
-learning_rate = 3e-4  # Standard LR for Adam
-
-# Initialize optimizers with better parameters
-vpg.optimizer_policy = torch.optim.Adam(policy.parameters(), lr=learning_rate)
-vpg.optimizer_value = torch.optim.Adam(value_net.parameters(), lr=learning_rate)
+num_episodes = 500
+max_steps = 200
+learning_rate = 3e-3
 
 # Training loop
 returns = []
+stats_history = defaultdict(list)
+episode_lengths = []
 
 for episode in range(num_episodes):
     observation, _ = env.reset()
@@ -79,12 +92,10 @@ for episode in range(num_episodes):
 
     # Collect trajectory
     for step in range(max_steps):
-        # Get action from policy
         action, _ = policy.get_action(observation)
-        # Convert action tensor to numpy, detaching from computation graph
         action_np = action.detach().cpu().numpy()
         next_observation, reward, done, truncated, _ = env.step(action_np)
-        # Store transition
+
         observations.append(observation)
         actions.append(action_np)
         rewards.append(reward)
@@ -97,20 +108,22 @@ for episode in range(num_episodes):
             break
 
     # Convert to tensors
-    observations = torch.FloatTensor(np.array(observations))
-    next_observations = torch.FloatTensor(np.array(next_observations))
-    actions = torch.FloatTensor(np.array(actions))
-    rewards = torch.FloatTensor(rewards)
-    dones = torch.FloatTensor(dones)
+    observations = torch.FloatTensor(np.array(observations)).to(vpg.device)
+    actions = torch.FloatTensor(np.array(actions)).to(vpg.device)
+    rewards = torch.FloatTensor(rewards).to(vpg.device)
+    dones = torch.FloatTensor(dones).to(vpg.device)
 
-    # Update policy
+    # Update policy and track stats
     stats = vpg.update(observations, actions, rewards, dones)
     returns.append(episode_reward)
+    episode_lengths.append(len(rewards))
 
-    # Print progress
+    for key, value in stats.items():
+        stats_history[key].append(value)
+
     if (episode + 1) % 10 == 0:
-        avg_return = np.mean(returns[-10:])
-        print(f"Episode {episode + 1}, Average Return: {avg_return:.2f}")
+        recent_avg = np.mean(returns[-10:])
+        print(f"Episode {episode + 1}, Average Return: {recent_avg:.2f}")
         pprint.pprint(stats, indent=4, depth=4)
 
 # Final test episode will also be recorded
@@ -130,3 +143,36 @@ while not done:
 
 print(f"Test episode reward: {total_reward:.2f}")
 env.close()
+
+# Save training data and plots
+training_data = {
+    "returns": returns,
+    "episode_lengths": episode_lengths,
+    "stats_history": {k: v for k, v in stats_history.items()},
+    "config": {
+        "hidden_dims": hidden_dims,
+        "learning_rate": vpg.learning_rate,
+        "gamma": vpg.gamma,
+        "gae_lambda": vpg.gae_lambda,
+        "max_steps": max_steps,
+        "num_episodes": num_episodes,
+        "seed": SEED,
+    },
+}
+
+# Save training data
+with open(f"{run_dir}/training_data.json", "w") as f:
+    json.dump(training_data, f, indent=4, cls=NumpyEncoder)
+
+# Generate and save plots
+save_training_plots(returns, episode_lengths, stats_history, plots_dir)
+
+
+# Helper class for JSON serialization
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.float32):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)

@@ -1,0 +1,16 @@
+{
+    "env_id": "CartPole-v1",
+    "seed": 42,
+    "hidden_dims": [
+        32,
+        32
+    ],
+    "activation": "Tanh",
+    "num_episodes": 250,
+    "max_steps": 500,
+    "learning_rate": 0.001,
+    "gamma": 0.95,
+    "entropy_coef": 0.01,
+    "max_grad_norm": 10.0,
+    "device": "cuda:0"
+}

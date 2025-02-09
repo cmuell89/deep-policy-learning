@@ -93,7 +93,7 @@ class TestFunctions(unittest.TestCase):
         gamma = 0.99
         gae_lambda = 0.95
 
-        advantages = generalized_advantage_estimate(
+        returns, advantages = generalized_advantage_estimate(
             rewards, values, dones, gamma, gae_lambda
         )
 

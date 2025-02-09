@@ -3,8 +3,10 @@ from setuptools import find_packages, setup
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
+
 def _get_pytorch_version():
     return "torch"
+
 
 setup(
     # Metadata
@@ -13,7 +15,6 @@ setup(
     author="Carl Mueller",
     description="Demonstration Assisted Natural Policy Gradient Implementation using the Panda Gymnasium environment",
     license="MIT",
-    
     # Package info
     packages=find_packages(exclude=()),
     install_requires=[
@@ -24,10 +25,10 @@ setup(
         "cloudpickle",
         "matplotlib",
         "panda-gym",
-
-
+        "tensorboard",
+        "stable-baselines3",
     ],
     extras_require={
         "tests": ["pytest"],
     },
-) 
+)

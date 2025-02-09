@@ -20,6 +20,8 @@ setup(
     install_requires=[
         _get_pytorch_version(),
         "gymnasium",
+        "gymnasium[classic-control]",
+        "gymnasium[other]",
         "numpy",
         "packaging",
         "cloudpickle",
@@ -27,6 +29,7 @@ setup(
         "panda-gym",
         "tensorboard",
         "stable-baselines3",
+        "opencv-python",
     ],
     extras_require={
         "tests": ["pytest"],

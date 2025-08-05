@@ -1,4 +1,4 @@
-# Learning and Robotics Challenge
+# Deep Policy Learning Implementations
 
 This repository contains PyTorch implementations of two deep reinforcement learning algorithms (PPO, VPG) for various environments including CartPole, Pendulum, and Panda robotic tasks.
 

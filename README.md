@@ -1,6 +1,8 @@
 # Learning and Robotics Challenge
 
-This repository contains implementations of reinforcement learning algorithms (PPO, VPG) for various environments including CartPole, Pendulum, and Panda robotic tasks.
+This repository contains PyTorch implementations of two deep reinforcement learning algorithms (PPO, VPG) for various environments including CartPole, Pendulum, and Panda robotic tasks.
+
+Success: mild --> still struggles to converge consistenly, but don't we all?
 
 ## Requirements
 
